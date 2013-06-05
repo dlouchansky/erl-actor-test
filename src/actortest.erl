@@ -7,58 +7,63 @@
 
 one(Messagecnt) ->
   Start = now(),
-  outStats("Started", helpers:diff(Start, Start)),
+  helpers:outStats("Started", Start, Start),
 
-  PID = erlang:spawn(fun() -> looper(self(), 0) end),
+  PID = erlang:spawn(fun() -> counter(self(), 0) end),
   sendMessagesToOne(Messagecnt, PID),
   Sent = now(),
-  outStats("Messages sent", helpers:diff(Start, Sent)),
+  helpers:outStats("Messages sent", Start, Sent),
 
   PID ! "exit",
-  io:format("Test took ~p seconds~n", [helpers:diff(Start, Sent)]),
-  io:format("Throughput = ~p messages per second~n",[helpers:perSec(Messagecnt, Start, Sent)]).
+  helpers:testTime("Overall", Start, Sent),
+  helpers:outThroughput(Messagecnt, Start, Sent).
+
 
 multiple(Actorcnt, Messagecnt) ->
   Start = now(),
-  outStats("Started", helpers:diff(Start, Start)),
+  helpers:outStats("Started", Start, Start),
 
   RandomActorIds = helpers:generateRandomNumList(Actorcnt, Messagecnt),
   RandomDone = now(),
-  outStats("Random list generated", helpers:diff(Start, RandomDone)),
+  helpers:outStats("Random list generated", Start, RandomDone),
 
   Actors = createActors(Actorcnt, self()),
   Created = now(),
-  outStats("Actors started", helpers:diff(Start, Created)),
+  helpers:outStats("Actors started", Start, Created),
 
   sendMessages(RandomActorIds, Actors),
   Sent = now(),
-  outStats("Messages sent", helpers:diff(Start, Sent)),
+  helpers:outStats("Messages sent", Start, Sent),
 
   killActors(Actors),
   waitCompletion(Actorcnt, Start, RandomDone, Created, Sent, Messagecnt).
 
-looper(ParentPID, MsgCnt) ->
+
+counter(ParentPID, MsgCnt) ->
   receive
-    {msg, Msg} ->
-      looper(ParentPID, MsgCnt + 1);
+    add ->
+      counter(ParentPID, MsgCnt + 1);
+    getcount ->
+      io:format("~p actor counted ~p.~n", [self(), MsgCnt]),
+      counter(ParentPID, MsgCnt);
     _ ->
       ParentPID ! {finished, MsgCnt}
   end.
 
-outStats(Action, Time) ->
-  io:format("~p at ~p. Memory usage: total - ~p KB, processes - ~p KB~n", [Action, Time, round(erlang:memory(total) / 1024), round(erlang:memory(processes) / 1024)]).
 
 sendMessages([], _) ->
   "ok";
 sendMessages([Head|Tail], Actors) ->
-  dict:fetch(Head, Actors) ! {msg, "Test"},
+  dict:fetch(Head, Actors) ! add,
   sendMessages(Tail,Actors).
+
 
 sendMessagesToOne(0, PID) ->
   "ok";
 sendMessagesToOne(Cnt, PID) ->
-  PID ! {msg, "Test"},
-  sendMessagesToOne(Cnt-1, PID).
+  PID ! add,
+  sendMessagesToOne(Cnt - 1, PID).
+
 
 createActors(Actorcnt, PID) ->
   createActors(dict:new(), Actorcnt, PID).
@@ -66,17 +71,19 @@ createActors(Actorcnt, PID) ->
 createActors(Dict, 0, _) ->
   Dict;
 createActors(Dict, Actorcnt, ParentPID) ->
-  PID = erlang:spawn(fun() -> looper(ParentPID, 0) end),
+  PID = erlang:spawn(fun() -> counter(ParentPID, 0) end),
   createActors(dict:store(Actorcnt, PID, Dict), Actorcnt - 1, ParentPID).
 
+
 killActors(ActorDict) ->
-    dict:map(fun(_, Val)-> Val ! "exit", "ok" end, ActorDict).
+    dict:map(fun(_, Val) -> Val ! "exit" end, ActorDict).
+
 
 waitCompletion(Actorcnt, Start, RandomDone, Created, Sent, Messagecnt) ->
   lists:foreach(fun (_) ->
-    receive {finished, MsgCnt} -> ok end
+    receive {finished, _} -> ok end
   end, lists:seq(1, Actorcnt)),
   Finish = now(),
-  io:format("Test took ~p seconds~n", [helpers:diff(Start, Finish)]),
-  io:format("Without random id generation - ~p seconds~n", [helpers:diff(RandomDone, Finish)]),
-  io:format("Throughput = ~p messages per second~n",[helpers:perSec(Messagecnt, Created, Sent)]).
+  helpers:testTime("Overall", Start, Finish),
+  helpers:testTime("Without random id generation", RandomDone, Finish),
+  helpers:outThroughput(Messagecnt, Created, Sent).

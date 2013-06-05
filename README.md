@@ -1,23 +1,23 @@
-erl-actor-test
+Erlang actor benchmark.
 ==============
 
-Erlang actor performance test.
+Erlang actor performance test aka benchmark.
 
-Two testing functions available:
+Two functions available:
 
-actortest:one(M). - sends M messages to one actor
-
-actortest:multiple(L, M). – randomly sends M messages to L actors.
-Actors are stored in one dict and that's why the more actors are 
-created, the less overall throughtput the system has.  
-
++   actortest:one(M). - sends M messages to one actor
++   actortest:multiple(A, M). – randomly sends M messages to A actors.
+    All actors are stored in one dict.
 
 Install, compile && run:
-1. Install Erlang
-2. Open Erlang shell
-3. Compile modules
-c(actortest.erl).
-c(helpers.erl).
-4. Run tests
-actortest:one(1000000).
-actortest:multiple(100, 1000000).
+1.  Install Erlang
+2.  Open Erlang shell
+3.  Compile modules
+
+    (actortest.erl).
+    (helpers.erl).
+
+4.  Run tests
+
+    actortest:one(1000000).
+    actortest:multiple(100, 1000000).

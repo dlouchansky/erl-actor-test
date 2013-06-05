@@ -3,7 +3,7 @@
 -author("dloutchansky").
 
 %% API
--export([perSec/3, diff/2, toSec/1, toMicroSeconds/1, generateRandomNumList/2]).
+-export([perSec/3, diff/2, toSec/1, toMicroSeconds/1, generateRandomNumList/2, outStats/3, outThroughput/3, testTime/3]).
 
 perSec(Size, Start, Finish) -> Size / diff(Start, Finish).
 
@@ -24,3 +24,13 @@ generateRandom(RandomList, _, 0) ->
   RandomList;
 generateRandom(Randomlist, UpperLimit, ListSize) ->
   generateRandom([random:uniform(UpperLimit)|Randomlist], UpperLimit, ListSize - 1).
+
+
+outStats(Action, Start, End) ->
+  io:format("~s at ~p. Memory usage: total - ~p KB, processes - ~p KB~n", [Action, diff(Start, End), round(erlang:memory(total) / 1024), round(erlang:memory(processes) / 1024)]).
+
+outThroughput(Messagecnt, Start, Sent) ->
+  io:format("Throughput = ~p messages per second~n",[helpers:perSec(Messagecnt, Start, Sent)]).
+
+testTime(Desc, Start, Finish) ->
+  io:format("~p took ~p seconds~n", [Desc, helpers:diff(Start, Finish)]).
