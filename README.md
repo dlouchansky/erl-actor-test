@@ -12,13 +12,11 @@ Two functions available:
 Install, compile && run:
 
 1.  Install Erlang
-
 2.  Open Erlang shell
-
 3.  Compile modules
     ```erlang
-    (actortest.erl).
-    (helpers.erl).
+    c(actortest.erl).
+    c(helpers.erl).
     ```
 4.  Run tests
     ```erlang
