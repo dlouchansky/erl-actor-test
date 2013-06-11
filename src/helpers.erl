@@ -1,4 +1,4 @@
-%% Time Formatting
+%% Helper module
 -module(helpers).
 -author("dloutchansky").
 

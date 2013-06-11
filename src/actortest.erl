@@ -1,24 +1,30 @@
-%% Copyright
+%% Main module
 -module(actortest).
 -author("dloutchansky").
 
 %% API
--export([multiple/2, one/1]).
+-export([multiple/3, multiple/2, one/2, one/1]).
 
-one(Messagecnt) ->
+one(MessageCnt) ->
+  one(MessageCnt, 1).
+
+one(Messagecnt, MessageTimeout) ->
   Start = now(),
   helpers:outStats("Started", Start, Start),
 
-  PID = createActor(self()),
+  PID = createActor(self(), MessageTimeout),
   sendMessagesToOne(Messagecnt, PID),
   Sent = now(),
   helpers:outStats("Messages sent", Start, Sent),
 
   killActor(PID),
-  waitCompletion(1, Start, Start, Sent, Messagecnt).
+  waitCompletion(1, Start, Start, Messagecnt).
 
 
 multiple(Actorcnt, Messagecnt) ->
+  multiple(Actorcnt, Messagecnt, 1).
+
+multiple(Actorcnt, Messagecnt, MessageTimeout) ->
   Start = now(),
   helpers:outStats("Started", Start, Start),
 
@@ -27,7 +33,7 @@ multiple(Actorcnt, Messagecnt) ->
   RandomDone = now(),
   helpers:outStats("Random list generated", Start, RandomDone),
 
-  Actors = createActors(Actorcnt, self()),
+  Actors = createActors(Actorcnt, self(), MessageTimeout),
   Created = now(),
   helpers:outStats("Actors started", Start, Created),
 
@@ -36,33 +42,40 @@ multiple(Actorcnt, Messagecnt) ->
   helpers:outStats("Messages sent", Start, Sent),
 
   killActors(Actors),
-  waitCompletion(Actorcnt, Start, Created, Sent, Messagecnt).
+  waitCompletion(Actorcnt, Start, Created, Messagecnt).
 
 
-createActors(Actorcnt, PID) ->
-  createActors(dict:new(), Actorcnt, PID).
+createActors(Actorcnt, PID, MessageTimeout) ->
+  createActors(dict:new(), Actorcnt, PID, MessageTimeout).
 
-createActors(Dict, 0, _) ->
+createActors(Dict, 0, _, _) ->
   Dict;
-createActors(Dict, Actorcnt, ParentPID) ->
-  PID = createActor(ParentPID),
-  createActors(dict:store(Actorcnt, PID, Dict), Actorcnt - 1, ParentPID).
+createActors(Dict, Actorcnt, ParentPID, MessageTimeout) ->
+  PID = createActor(ParentPID, MessageTimeout),
+  createActors(dict:store(Actorcnt, PID, Dict), Actorcnt - 1, ParentPID, MessageTimeout).
 
-createActor(ParentPID) ->
-  erlang:spawn(fun() -> count(ParentPID, 0) end).
+createActor(ParentPID, MessageTimeout) ->
+  erlang:spawn(fun() -> count(ParentPID, MessageTimeout, 0) end).
 
 
-count(ParentPID, MsgCnt) ->
+count(ParentPID, MessageTimeout, MsgCnt) ->
   receive
     add ->
-      count(ParentPID, MsgCnt + 1);
+      % making it a relatively long-running task, 1 millisecond per msg
+      case MessageTimeout of
+        0 ->
+          ok;
+        _ ->
+          timer:sleep(MessageTimeout)
+      end,
+      count(ParentPID, MessageTimeout, MsgCnt + 1);
     getcount ->
       helpers:outCounted(self(), MsgCnt),
-      count(ParentPID, MsgCnt);
+      count(ParentPID, MessageTimeout, MsgCnt);
     exit ->
       ParentPID ! {finished, MsgCnt};
     _ ->
-      count(ParentPID, MsgCnt)
+      count(ParentPID, MessageTimeout, MsgCnt)
   end.
 
 
@@ -73,7 +86,7 @@ sendMessages([Head|Tail], Actors) ->
   sendMessages(Tail,Actors).
 
 
-sendMessagesToOne(0, PID) ->
+sendMessagesToOne(0, _) ->
   ok;
 sendMessagesToOne(Cnt, PID) ->
   PID ! add,
@@ -87,11 +100,11 @@ killActor(PID) ->
   PID ! exit.
 
 
-waitCompletion(Actorcnt, Start, Created, Sent, Messagecnt) ->
+waitCompletion(Actorcnt, Start, Created, Messagecnt) ->
   waitMurder(Actorcnt),
   Finish = now(),
   helpers:testTime("Overall", Start, Finish),
-  helpers:outThroughput(Messagecnt, Created, Sent).
+  helpers:outThroughput(Messagecnt, Created, Finish).
 
 
 waitMurder(0) ->
@@ -100,6 +113,4 @@ waitMurder(Cnt) ->
   receive
     {finished, _} ->
       waitMurder(Cnt - 1)
-  after 5000 ->
-    exit(string:concat(integer_to_list(Cnt), " actor(s) haven't been killed!"))
   end.
